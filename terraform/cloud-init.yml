@@ -1,0 +1,34 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - jq
+
+write_files:
+  - path: /opt/searxng/deploy-marker
+    content: |
+      Provisioned by cloud-init. Stack deployed via scripts/deploy.sh after first boot.
+
+runcmd:
+  # Install Docker
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  - systemctl enable docker
+  - usermod -aG docker ubuntu
+
+  # Install Tailscale
+  - curl -fsSL https://tailscale.com/install.sh | sh
+
+  # Create compose directory
+  - mkdir -p /opt/searxng
+
+  # Signal cloud-init complete
+  - touch /opt/searxng/.cloud-init-complete

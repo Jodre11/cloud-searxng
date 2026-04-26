@@ -1,0 +1,7 @@
+tenancy_ocid        = "ocid1.tenancy.oc1..aaaa..."
+user_ocid           = "ocid1.user.oc1..aaaa..."
+fingerprint         = "aa:bb:cc:..."
+private_key_path    = "~/.oci/oci_api_key.pem"
+region              = "eu-stockholm-1"
+compartment_ocid    = "ocid1.tenancy.oc1..aaaa..."
+ssh_public_key_path = "~/.ssh/id_ed25519.pub"

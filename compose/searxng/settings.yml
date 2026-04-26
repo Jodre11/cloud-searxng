@@ -1,0 +1,68 @@
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: "cloud-searxng"
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "en"
+  formats:
+    - html
+    - json
+
+server:
+  secret_key: "${SEARXNG_SECRET_KEY}"
+  limiter: true
+  image_proxy: true
+  bind_address: "0.0.0.0"
+  port: 8080
+
+ui:
+  static_use_hash: false
+  default_locale: "en"
+  query_in_title: false
+  infinite_scroll: true
+  center_alignment: true
+  results_on_new_tab: false
+  theme_args:
+    simple_style: "auto"
+  default_theme: simple
+
+outgoing:
+  request_timeout: 6.0
+  max_request_timeout: 10.0
+  pool_connections: 100
+  pool_maxsize: 20
+
+engines:
+  - name: google
+    engine: google
+    shortcut: g
+    weight: 1.5
+
+  - name: bing
+    engine: bing
+    shortcut: b
+    weight: 1.2
+
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: d
+    weight: 1.0
+
+  - name: brave
+    engine: brave
+    shortcut: br
+    weight: 1.0
+
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    weight: 0.8
+
+  - name: github
+    engine: github
+    shortcut: gh
+    weight: 0.8
