@@ -14,6 +14,11 @@ rsync -avz --exclude='.env.example' \
     "${COMPOSE_DIR}/" \
     "ubuntu@${HOST}:${REMOTE_DIR}/"
 
+echo "Syncing scripts to ${HOST}:${REMOTE_DIR}/scripts/..."
+rsync -avz \
+    "${SCRIPT_DIR}/health-check.sh" \
+    "ubuntu@${HOST}:${REMOTE_DIR}/scripts/"
+
 if [[ "$FIRST_RUN" == "--first-run" ]]; then
     echo "First run: setting up Tailscale..."
     # shellcheck disable=SC2029
