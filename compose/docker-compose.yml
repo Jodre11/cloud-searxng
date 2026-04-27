@@ -56,7 +56,7 @@ services:
     container_name: caddy
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8888:8888"
+      - "8888:8888"
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
@@ -74,6 +74,7 @@ services:
       - WATCHTOWER_SCHEDULE=0 0 4 * * *
       - WATCHTOWER_INCLUDE_STOPPED=true
       - WATCHTOWER_REVIVE_STOPPED=true
+      - DOCKER_API_VERSION=1.40
       - TZ=Europe/London
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
