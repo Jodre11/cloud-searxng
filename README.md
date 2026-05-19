@@ -3,6 +3,21 @@
 Private [SearXNG](https://docs.searxng.org/) instance running on Oracle Cloud Free Tier, accessible
 exclusively over [Tailscale](https://tailscale.com/).
 
+## Why
+
+A private, no-logging search frontend on infrastructure I control. Constraints:
+
+- **Free** — Oracle Cloud Free Tier (ARM A1.Flex, 4 OCPU / 24 GB) covers the compute indefinitely.
+- **No public exposure** — Tailscale Serve handles ingress; no public ports except temporary SSH
+  during bootstrap, removed once Tailscale SSH is confirmed working.
+- **VPN egress** — all search traffic exits through Mullvad WireGuard via Gluetun, so my IP isn't
+  the one querying upstream engines.
+- **Reproducible** — Terraform for OCI, Docker Compose for the runtime, cloud-init for bootstrap.
+  One `terraform apply` + one `deploy.sh` rebuilds the whole stack.
+
+This repo is the recipe. Forking and running it on your own OCI tenancy should take about an hour
+the first time.
+
 ## Architecture
 
 ```
