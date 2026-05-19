@@ -10,5 +10,8 @@ crash.log
 .env
 compose/.env
 
+# Local agent state
+.claude/
+
 # OS
 .DS_Store
