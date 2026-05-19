@@ -5,7 +5,7 @@
 If you spot a security issue in this repository's configuration, scripts, or
 documented patterns, please report it privately via
 [GitHub Security Advisories](https://github.com/Jodre11/cloud-searxng/security/advisories/new)
-or by emailing 63795493+Jodre11@users.noreply.github.com.
+or by emailing jodre11.public@gmail.com.
 
 Please don't open a public issue for security concerns.
 
