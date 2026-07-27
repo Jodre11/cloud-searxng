@@ -131,6 +131,19 @@ Install the heartbeat cron job on the instance:
 sudo crontab -l 2>/dev/null | { cat; echo '*/3 * * * * BETTERSTACK_HEARTBEAT_URL="<url>" /opt/searxng/scripts/health-check.sh'; } | sudo crontab -
 ```
 
+### 7. VPN Exit Rotation Cron (Recommended)
+
+Gluetun picks one Mullvad server at start and stays pinned to it. The commercial search
+engines (Brave, DuckDuckGo, Startpage) intermittently return `403` / `429` / CAPTCHA from
+shared Mullvad exit IPs; when tripped, SearXNG locally suspends that engine for a cooldown
+(`suspended_time`), so a stale exit progressively degrades results. `rotate-vpn.sh` forces a
+fresh exit by restarting Gluetun, then restarts SearXNG (required — it shares Gluetun's
+network namespace via `network_mode: service:gluetun` and loses networking otherwise).
+
+```bash
+crontab -l 2>/dev/null | { cat; echo '0 */12 * * * /opt/searxng/scripts/rotate-vpn.sh >> /var/log/searxng-rotate.log 2>&1'; } | crontab -
+```
+
 ## Access
 
 | Method          | URL                                      |
@@ -151,7 +164,8 @@ cloud-searxng/
 ├── scripts/
 │   ├── deploy.sh                 # Rsync + docker compose up
 │   ├── env.sh                    # Load OCI creds from Bitwarden
-│   └── health-check.sh           # Heartbeat health check
+│   ├── health-check.sh           # Heartbeat health check
+│   └── rotate-vpn.sh             # Rotate Mullvad exit (restart gluetun + searxng)
 └── terraform/
     ├── main.tf                   # VCN, subnet, security list, instance
     ├── variables.tf              # Input variables

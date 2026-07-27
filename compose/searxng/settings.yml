@@ -14,7 +14,10 @@ search:
 
 server:
   secret_key: "${SEARXNG_SECRET_KEY}"
-  limiter: true
+  # Incoming abuse limiter is off: this instance is private (Tailscale-only, no
+  # public ingress) and single-user. The limiter needs a Valkey/Redis backend it
+  # doesn't have, so leaving it on only logged "limiter requires Valkey" errors.
+  limiter: false
   image_proxy: true
   bind_address: "0.0.0.0"
   port: 8080
