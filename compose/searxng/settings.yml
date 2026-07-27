@@ -38,6 +38,14 @@ outgoing:
   max_request_timeout: 10.0
   pool_connections: 100
   pool_maxsize: 20
+  # Distribute outgoing engine requests across the gluetun proxy pool. httpx
+  # round-robins the list per request, so a concurrent research burst spreads
+  # across 3 Mullvad exit IPs instead of hammering one.
+  proxies:
+    all://:
+      - http://gluetun-a:8888
+      - http://gluetun-b:8888
+      - http://gluetun-c:8888
 
 engines:
   - name: google
