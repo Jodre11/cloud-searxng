@@ -1,7 +1,7 @@
 services:
-  gluetun:
+  gluetun-a:
     image: qmcgaw/gluetun:latest
-    container_name: gluetun
+    container_name: gluetun-a
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
@@ -10,15 +10,82 @@ services:
     environment:
       - VPN_SERVICE_PROVIDER=${VPN_PROVIDER}
       - VPN_TYPE=wireguard
-      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
-      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY_A}
+      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES_A}
       - SERVER_COUNTRIES=${VPN_SERVER_COUNTRIES}
+      - HTTPPROXY=on
+      - HTTPPROXY_LISTENING_ADDRESS=:8888
+      # Allow the killswitch to return proxy responses to the internal subnet.
+      - FIREWALL_OUTBOUND_SUBNETS=172.28.0.0/16
       - TZ=Europe/London
       - UPDATER_PERIOD=24h
-    ports:
-      - "127.0.0.1:8080:8080"
+    networks:
+      - internal
+      - wan
     volumes:
-      - gluetun-data:/gluetun
+      - gluetun-a-data:/gluetun
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null https://am.i.mullvad.net/connected || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  gluetun-b:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun-b
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=${VPN_PROVIDER}
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY_B}
+      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES_B}
+      - SERVER_COUNTRIES=${VPN_SERVER_COUNTRIES}
+      - HTTPPROXY=on
+      - HTTPPROXY_LISTENING_ADDRESS=:8888
+      - FIREWALL_OUTBOUND_SUBNETS=172.28.0.0/16
+      - TZ=Europe/London
+      - UPDATER_PERIOD=24h
+    networks:
+      - internal
+      - wan
+    volumes:
+      - gluetun-b-data:/gluetun
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null https://am.i.mullvad.net/connected || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  gluetun-c:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun-c
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=${VPN_PROVIDER}
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY_C}
+      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES_C}
+      - SERVER_COUNTRIES=${VPN_SERVER_COUNTRIES}
+      - HTTPPROXY=on
+      - HTTPPROXY_LISTENING_ADDRESS=:8888
+      - FIREWALL_OUTBOUND_SUBNETS=172.28.0.0/16
+      - TZ=Europe/London
+      - UPDATER_PERIOD=24h
+    networks:
+      - internal
+      - wan
+    volumes:
+      - gluetun-c-data:/gluetun
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null https://am.i.mullvad.net/connected || exit 1"]
       interval: 30s
@@ -30,9 +97,14 @@ services:
     image: searxng/searxng:latest
     container_name: searxng
     restart: unless-stopped
-    network_mode: "service:gluetun"
+    networks:
+      - internal
     depends_on:
-      gluetun:
+      gluetun-a:
+        condition: service_healthy
+      gluetun-b:
+        condition: service_healthy
+      gluetun-c:
         condition: service_healthy
     volumes:
       - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
@@ -55,6 +127,8 @@ services:
     image: caddy:2-alpine
     container_name: caddy
     restart: unless-stopped
+    networks:
+      - internal
     ports:
       - "8888:8888"
     volumes:
@@ -79,7 +153,23 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
+networks:
+  # No WAN gateway — searxng/caddy sit here and cannot reach the internet
+  # except via the gluetun proxies (fail-closed, no IP leak). Subnet pinned so
+  # gluetun's killswitch can allow return traffic via FIREWALL_OUTBOUND_SUBNETS.
+  internal:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+  # Normal bridge; only the gluetun containers attach here for tunnel egress.
+  wan:
+    driver: bridge
+
 volumes:
-  gluetun-data:
+  gluetun-a-data:
+  gluetun-b-data:
+  gluetun-c-data:
   caddy-data:
   caddy-config:
