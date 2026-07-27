@@ -129,6 +129,7 @@ services:
     restart: unless-stopped
     networks:
       - internal
+      - wan
     ports:
       - "8888:8888"
     volumes:

@@ -18,6 +18,11 @@ CONTAINER="${1:?Usage: rotate-exit.sh <gluetun-a|gluetun-b|gluetun-c>}"
 
 log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $*"; }
 
+if [[ ! "$CONTAINER" =~ ^gluetun-[abc]$ ]]; then
+    log "ERROR: unknown container '${CONTAINER}' (expected gluetun-a|gluetun-b|gluetun-c)"
+    exit 1
+fi
+
 wait_for_container_healthy() {
     local name="$1" tries="${2:-24}" i status
     for ((i = 1; i <= tries; i++)); do

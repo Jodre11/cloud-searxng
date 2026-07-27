@@ -49,7 +49,7 @@ once Tailscale SSH is confirmed working.
 - [Bitwarden CLI](https://bitwarden.com/help/cli/) (for OCI credentials via `scripts/env.sh`)
 - OCI API key stored in Bitwarden (item: "OCI - cloud-searxng")
 - SSH key pair (default `~/.ssh/id_ed25519`)
-- [Mullvad VPN](https://mullvad.net/) account with a WireGuard configuration
+- [Mullvad VPN](https://mullvad.net/) account with three WireGuard configurations (one per exit)
 - [Tailscale](https://tailscale.com/) account with Serve enabled
 - [Better Stack](https://betterstack.com/) account (optional, for heartbeat monitoring)
 
