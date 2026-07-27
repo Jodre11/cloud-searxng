@@ -28,16 +28,17 @@ Tailscale (HTTPS)                  OCI VM.Standard.A1.Flex (ARM, 4 OCPU, 24 GB)
        ▼
   Tailscale Serve (:443)  ──►  Caddy (:8888)  ──►  SearXNG (:8080)
                                                          │
-                                                    network_mode: service:gluetun
-                                                         │
-                                                    Gluetun (WireGuard)
-                                                         │
-                                                    Mullvad VPN exit
+                                   searxng ──▶ outgoing.proxies (httpx round-robin, per request)
+                                                 ├─▶ gluetun-a  HTTP proxy  ─▶ Mullvad exit 1
+                                                 ├─▶ gluetun-b  HTTP proxy  ─▶ Mullvad exit 2
+                                                 └─▶ gluetun-c  HTTP proxy  ─▶ Mullvad exit 3
 ```
 
-All search traffic exits through Mullvad VPN (via Gluetun). Tailscale Serve provides auto-managed
-TLS certificates. Caddy reverse-proxies and strips identifying headers. Watchtower auto-updates
-container images daily at 04:00.
+Search traffic exits through a pool of three Gluetun HTTP-proxy containers, each pinned to a
+different Mullvad WireGuard exit. SearXNG's `outgoing.proxies` list round-robins across them via
+httpx, one exit per request. Tailscale Serve provides auto-managed TLS certificates. Caddy
+reverse-proxies and strips identifying headers. Watchtower auto-updates container images daily
+at 04:00.
 
 No ports are exposed to the public internet except SSH (port 22), which is intended to be removed
 once Tailscale SSH is confirmed working.
@@ -48,7 +49,7 @@ once Tailscale SSH is confirmed working.
 - [Bitwarden CLI](https://bitwarden.com/help/cli/) (for OCI credentials via `scripts/env.sh`)
 - OCI API key stored in Bitwarden (item: "OCI - cloud-searxng")
 - SSH key pair (default `~/.ssh/id_ed25519`)
-- [Mullvad VPN](https://mullvad.net/) account with a WireGuard configuration
+- [Mullvad VPN](https://mullvad.net/) account with three WireGuard configurations (one per exit)
 - [Tailscale](https://tailscale.com/) account with Serve enabled
 - [Better Stack](https://betterstack.com/) account (optional, for heartbeat monitoring)
 
@@ -83,14 +84,21 @@ ssh ubuntu@<public-ip> "TERM=xterm-256color nano /opt/searxng/.env"
 
 Fill in:
 
-| Variable                  | Source                                               |
-|---------------------------|------------------------------------------------------|
-| `WIREGUARD_PRIVATE_KEY`   | Mullvad WireGuard config file (`[Interface]` section) |
-| `WIREGUARD_ADDRESSES`     | Mullvad WireGuard config file (IPv4 address)          |
-| `VPN_SERVER_COUNTRIES`    | Comma-separated list (e.g. `Sweden,Switzerland,Netherlands`) |
-| `SEARXNG_SECRET_KEY`      | Generate on-instance: `openssl rand -hex 32`          |
-| `TAILSCALE_AUTHKEY`       | Tailscale admin console > Settings > Keys             |
-| `BETTERSTACK_HEARTBEAT_URL` | Better Stack > Heartbeats > create heartbeat        |
+| Variable                    | Source                                               |
+|-----------------------------|------------------------------------------------------|
+| `WIREGUARD_PRIVATE_KEY_A`   | Mullvad WireGuard config A (`[Interface]` section)   |
+| `WIREGUARD_ADDRESSES_A`     | Mullvad WireGuard config A (IPv4 address)             |
+| `WIREGUARD_PRIVATE_KEY_B`   | Mullvad WireGuard config B (`[Interface]` section)   |
+| `WIREGUARD_ADDRESSES_B`     | Mullvad WireGuard config B (IPv4 address)             |
+| `WIREGUARD_PRIVATE_KEY_C`   | Mullvad WireGuard config C (`[Interface]` section)   |
+| `WIREGUARD_ADDRESSES_C`     | Mullvad WireGuard config C (IPv4 address)             |
+| `VPN_SERVER_COUNTRIES`      | Comma-separated list (e.g. `Sweden,Switzerland,Netherlands`) |
+| `SEARXNG_SECRET_KEY`        | Generate on-instance: `openssl rand -hex 32`          |
+| `TAILSCALE_AUTHKEY`         | Tailscale admin console > Settings > Keys             |
+| `BETTERSTACK_HEARTBEAT_URL` | Better Stack > Heartbeats > create heartbeat          |
+
+Three separate Mullvad WireGuard configs are required — one per exit. Generate each at the
+Mullvad account WireGuard-config page; do not reuse one key across tunnels.
 
 The `.env` file should be `chmod 600` and never leaves the instance.
 
@@ -133,15 +141,19 @@ sudo crontab -l 2>/dev/null | { cat; echo '*/3 * * * * BETTERSTACK_HEARTBEAT_URL
 
 ### 7. VPN Exit Rotation Cron (Recommended)
 
-Gluetun picks one Mullvad server at start and stays pinned to it. The commercial search
-engines (Brave, DuckDuckGo, Startpage) intermittently return `403` / `429` / CAPTCHA from
+Each Gluetun container picks one Mullvad server at start and stays pinned to it. The commercial
+search engines (Brave, DuckDuckGo, Startpage) intermittently return `403` / `429` / CAPTCHA from
 shared Mullvad exit IPs; when tripped, SearXNG locally suspends that engine for a cooldown
-(`suspended_time`), so a stale exit progressively degrades results. `rotate-vpn.sh` forces a
-fresh exit by restarting Gluetun, then restarts SearXNG (required — it shares Gluetun's
-network namespace via `network_mode: service:gluetun` and loses networking otherwise).
+(`suspended_time`), so a stale exit progressively degrades results. `rotate-exit.sh` forces a
+fresh exit by restarting a named Gluetun container. Exits refresh once per 24h, 8h apart, so at
+most one is mid-rotation at any instant and the pool is never more than 1/3 degraded.
 
 ```bash
-crontab -l 2>/dev/null | { cat; echo '0 */12 * * * /opt/searxng/scripts/rotate-vpn.sh >> /var/log/searxng-rotate.log 2>&1'; } | crontab -
+crontab -l 2>/dev/null | { cat; \
+  echo '0  2 * * * /opt/searxng/scripts/rotate-exit.sh gluetun-a >> /var/log/searxng-rotate.log 2>&1'; \
+  echo '0 10 * * * /opt/searxng/scripts/rotate-exit.sh gluetun-b >> /var/log/searxng-rotate.log 2>&1'; \
+  echo '0 18 * * * /opt/searxng/scripts/rotate-exit.sh gluetun-c >> /var/log/searxng-rotate.log 2>&1'; \
+} | crontab -
 ```
 
 ## Access
@@ -165,7 +177,7 @@ cloud-searxng/
 │   ├── deploy.sh                 # Rsync + docker compose up
 │   ├── env.sh                    # Load OCI creds from Bitwarden
 │   ├── health-check.sh           # Heartbeat health check
-│   └── rotate-vpn.sh             # Rotate Mullvad exit (restart gluetun + searxng)
+│   └── rotate-exit.sh            # Rotate one gluetun exit (staggered pool rotation)
 └── terraform/
     ├── main.tf                   # VCN, subnet, security list, instance
     ├── variables.tf              # Input variables

@@ -1,5 +1,5 @@
 :8888 {
-	reverse_proxy gluetun:8080
+	reverse_proxy searxng:8080
 
 	header {
 		-Server

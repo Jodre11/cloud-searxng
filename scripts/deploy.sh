@@ -17,7 +17,7 @@ rsync -avz --exclude='.env.example' \
 echo "Syncing scripts to ${HOST}:${REMOTE_DIR}/scripts/..."
 rsync -avz \
     "${SCRIPT_DIR}/health-check.sh" \
-    "${SCRIPT_DIR}/rotate-vpn.sh" \
+    "${SCRIPT_DIR}/rotate-exit.sh" \
     "ubuntu@${HOST}:${REMOTE_DIR}/scripts/"
 
 if [[ "$FIRST_RUN" == "--first-run" ]]; then
