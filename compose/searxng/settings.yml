@@ -69,3 +69,9 @@ engines:
     engine: github
     shortcut: gh
     weight: 0.8
+
+  # Startpage CAPTCHAs shared VPN exit IPs on every request (1h cooldown), so it
+  # never returns results here. Disable the default-settings entry.
+  - name: startpage
+    engine: startpage
+    disabled: true
