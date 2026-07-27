@@ -83,3 +83,15 @@ engines:
   - name: startpage
     engine: startpage
     disabled: true
+
+  # Wikidata's init SPARQL query to query.wikidata.org 403s because Wikimedia
+  # (WDQS) blocks any User-Agent starting with "SearXNG/" — the stock Docker
+  # image's default UA. Not a VPN issue (reproduces without a proxy) and no
+  # config workaround exists: useragent_suffix only appends, can't change the
+  # blocked prefix. Upstream fix (caching init data) is unreleased. See
+  # searxng/searxng#6454. Wikipedia already covers the encyclopedic case.
+  # NOTE: `inactive` (not `disabled`) — only `inactive` skips engine init();
+  # `disabled` still runs init(), which re-triggers the 403 on every startup.
+  - name: wikidata
+    engine: wikidata
+    inactive: true
