@@ -95,3 +95,18 @@ engines:
   - name: wikidata
     engine: wikidata
     inactive: true
+
+  # Default-settings engines we don't use that fail to init on this box and only
+  # add startup log noise: ahmia/torch are Tor onion engines (no tor proxy here),
+  # radio browser can't resolve its host. `inactive` skips init entirely.
+  - name: ahmia
+    engine: ahmia
+    inactive: true
+
+  - name: torch
+    engine: xpath
+    inactive: true
+
+  - name: radio browser
+    engine: radio_browser
+    inactive: true
