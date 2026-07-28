@@ -48,15 +48,24 @@ outgoing:
       - http://gluetun-c:8888
 
 engines:
+  # Upstream flipped the default flags on these two reliable engines
+  # (2026.7.26: google -> inactive, bing -> disabled). With
+  # use_default_settings, an override that omits the flag INHERITS the new
+  # default, so both silently dropped out and search returned no results.
+  # Pin the flags explicitly so an upstream default flip can't disable them.
   - name: google
     engine: google
     shortcut: g
     weight: 1.5
+    inactive: false
+    disabled: false
 
   - name: bing
     engine: bing
     shortcut: b
     weight: 1.2
+    inactive: false
+    disabled: false
 
   - name: duckduckgo
     engine: duckduckgo
@@ -82,6 +91,13 @@ engines:
   # never returns results here. Disable the default-settings entry.
   - name: startpage
     engine: startpage
+    disabled: true
+
+  # google cse became a default-on engine in 2026.7.26. It 429s on the shared
+  # Mullvad exits ("unusual traffic from your network") and only adds failure
+  # noise — the standard `google` engine above is the reliable one. Disable it.
+  - name: google cse
+    engine: google_cse
     disabled: true
 
   # Wikidata's init SPARQL query to query.wikidata.org 403s because Wikimedia
