@@ -48,25 +48,128 @@ outgoing:
       - http://gluetun-c:8888
 
 engines:
-  # Upstream flipped the default flags on these two reliable engines
-  # (2026.7.26: google -> inactive, bing -> disabled). With
-  # use_default_settings, an override that omits the flag INHERITS the new
-  # default, so both silently dropped out and search returned no results.
-  # Pin the flags explicitly so an upstream default flip can't disable them.
-  - name: google
-    engine: google
-    shortcut: g
-    weight: 1.5
-    inactive: false
-    disabled: false
+  # Engine selection here is EMPIRICAL, measured from this instance on
+  # 2026-07-31 (28 candidates, 3 queries, repeated runs, scored on whether
+  # results actually matched the query). Everything egresses via the Mullvad
+  # proxy pool, and the big-brand engines all treat those exits as hostile
+  # traffic. Two failure modes matter, and only one of them is visible:
+  #
+  #   LOUD  — 403/429/CAPTCHA. Engine reports an error, SearXNG marks it
+  #           unresponsive, results are merely missing. brave, duckduckgo,
+  #           startpage, qwant, mojeek, yahoo, yep all do this here.
+  #   QUIET — HTTP 200 with a plausible-looking page that is not our search.
+  #           Nothing is logged, `unresponsive_engines` stays empty, and the
+  #           junk is merged into the ranking as if it were good. Far worse.
+  #
+  # bing and google both fail QUIETLY from this instance, so both are off.
+  # Note upstream's own defaults already have bing `disabled` and google
+  # `inactive`; a previous commit here force-enabled both. That fought
+  # upstream's assessment and lost — do not re-enable them without re-running
+  # the measurement.
 
+  # Bing: serves DECOY results to non-residential IPs. Returns 200, echoes the
+  # query back correctly, and renders 10 well-formed b_algo blocks of results
+  # for a completely different query — observed junk included Power BI, Baidu
+  # Zhidao, Outlook, AliExpress, a Moroccan university, and (for "caldigit")
+  # ten adult-content results for the unrelated term "bjhouse". Verified as an
+  # IP-reputation response, not a request defect: byte-identical requests score
+  # 9/9 relevant from a residential IP and 0/10 from all 3 Mullvad exits AND
+  # from the OCI datacenter IP with the VPN bypassed. Cookie warm-up (full
+  # MUID/_EDGE_S set), form=QBLH, mkt=en-GB and matching Accept-Language were
+  # all tested and changed nothing. It intermittently works (~1 run in 3),
+  # which is why this went unnoticed — with weight 1.2 it was outranking good
+  # results. There is no way to call it correctly from here.
   - name: bing
     engine: bing
-    shortcut: b
-    weight: 1.2
-    inactive: false
+    shortcut: bi
+    disabled: true
+
+  # Google: served the "enable JavaScript" interstitial on every request from
+  # every exit. searx/engines/google.py `detect_google_sorry()` only recognises
+  # /sorry/ CAPTCHA pages, so this block page is parsed as a normal SERP,
+  # yields nothing, and returns 0 results with NO error and NO log line.
+  # Matches upstream's `inactive: true` default. `inactive` (not `disabled`)
+  # keeps it out of the init path entirely.
+  - name: google
+    engine: google
+    inactive: true
+
+  # --- Primary general engines: measured reliable AND relevant from here ---
+  # Each returned results on every run and scored >=0.90 relevant. They are
+  # mutually independent (pairwise Jaccard < 0.6 on result URLs), which matters
+  # because SearXNG's score multiplies by the number of engines agreeing on a
+  # result — independent agreement is a real quality signal, whereas several
+  # front-ends onto one index would just amplify a single provider's opinion.
+
+  # DuckDuckGo's HTML endpoint. Distinct from the `duckduckgo` engine below:
+  # that one uses the JSON API and gets 403d on these exits, while this one is
+  # unaffected. Scored 30/30. This is the closest thing to a mainstream index
+  # that works from here.
+  - name: duckduckgo web
+    engine: duckduckgo_web
+    shortcut: ddgw
+    weight: 1.5
     disabled: false
 
+  # Google results via the Programmable Search JSON path — reaches Google's
+  # index without tripping the bot interstitial that kills the `google` engine.
+  # Scored 57/60 and consistently returns 20 results. Previously disabled here
+  # for 429s; re-measured and it is now the strongest performer, so it is back.
+  - name: google cse
+    engine: google_cse
+    shortcut: goc
+    weight: 1.5
+    disabled: false
+
+  # Scored 56/56, ~18 results/run, 15 distinct hosts.
+  - name: resulthunter
+    engine: resulthunter
+    shortcut: reh
+    weight: 1.2
+    disabled: false
+
+  # Scored 29/30.
+  - name: privacywall
+    engine: privacywall
+    shortcut: pw
+    weight: 1.0
+    disabled: false
+
+  # Scored 30/30.
+  - name: gmx
+    engine: gmx
+    shortcut: gmx
+    weight: 1.0
+    disabled: false
+
+  # Scored 27/30. Czech index — adds genuinely different coverage.
+  - name: seznam
+    engine: seznam
+    shortcut: szn
+    weight: 0.9
+    disabled: false
+
+  # Scored 27/27.
+  - name: zapmeta
+    engine: xpath
+    shortcut: zpm
+    weight: 0.9
+    disabled: false
+
+  # dogpile and searchtoday both scored ~0.96 but overlap each other (Jaccard
+  # 0.52), so only dogpile is enabled — searchtoday would mostly duplicate its
+  # votes. infospace shares searchtoday's `s1search` engine and is left off for
+  # the same reason. Any of them can still be reached by bang (!std, !ifs).
+  - name: dogpile
+    engine: dogpile
+    shortcut: dog
+    weight: 0.9
+    disabled: false
+
+  # --- Kept enabled: intermittent but LOUD when they fail ---
+  # Both 403/429 on these exits much of the time. That is acceptable because
+  # the failure is reported rather than silently poisoning results, and when
+  # they do answer the results are good. They also self-recover.
   - name: duckduckgo
     engine: duckduckgo
     shortcut: d
@@ -91,13 +194,6 @@ engines:
   # never returns results here. Disable the default-settings entry.
   - name: startpage
     engine: startpage
-    disabled: true
-
-  # google cse became a default-on engine in 2026.7.26. It 429s on the shared
-  # Mullvad exits ("unusual traffic from your network") and only adds failure
-  # noise — the standard `google` engine above is the reliable one. Disable it.
-  - name: google cse
-    engine: google_cse
     disabled: true
 
   # Wikidata's init SPARQL query to query.wikidata.org 403s because Wikimedia
