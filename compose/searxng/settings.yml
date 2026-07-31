@@ -222,3 +222,158 @@ engines:
   - name: radio browser
     engine: radio_browser
     inactive: true
+
+  # ===================================================================
+  # Non-general categories, audited 2026-07-31 by the same method: every
+  # enabled engine bang-tested through the live instance, then classified.
+  #
+  # Good news first: NO other engine reproduces bing web's decoy behaviour.
+  # bing images/videos/news use different endpoints and return correct,
+  # relevant results, so they stay. 52 engines passed unchanged.
+  #
+  # The engines below returned HTTP 200 and zero results with NO error and
+  # NO log line — the same QUIET class as bing/google, just caused by bot
+  # walls rather than decoys. Each was confirmed in-process against the
+  # engine's own request()/response() code. Left enabled they are dead
+  # weight that looks healthy; `disabled` keeps them bang-callable so a
+  # future recheck is one query away.
+
+  # PyPI and Bandcamp both sit behind the same JS interstitial — a 3036-byte
+  # page titled "Client Challenge" asking to enable JavaScript. Identical
+  # byte count from both hosts, so it is one vendor's product. No headless
+  # browser here, so it cannot be satisfied.
+  - name: pypi
+    engine: pypi
+    shortcut: pypi
+    disabled: true
+
+  - name: bandcamp
+    engine: bandcamp
+    shortcut: bc
+    disabled: true
+
+  # Arch Wiki now runs Anubis, a proof-of-work anti-AI-scraper wall
+  # ("Making sure you're not a bot!"). Requires solving a JS PoW challenge.
+  # `free software directory` and `gentoo` cover software-wiki queries.
+  - name: arch linux wiki
+    engine: archlinux
+    shortcut: al
+    disabled: true
+
+  # solidtorrents.to redirects to bitsearch.eu, whose markup no longer
+  # matches the engine's parser — 163KB of HTML, 0 results extracted.
+  # Upstream engine needs updating; btdigg/nyaa/piratebay cover this.
+  - name: solidtorrents
+    engine: solidtorrents
+    shortcut: solid
+    disabled: true
+
+  # etymonline is an `xpath` engine whose selectors no longer match the
+  # site. wiktionary + wordnik already cover dictionary lookups.
+  - name: etymonline
+    engine: xpath
+    shortcut: et
+    disabled: true
+
+  # The public lingva.ml instance returns HTTP errors (dead deployment).
+  # dictzone and mymemory translated both work and stay enabled — note
+  # translate engines need "en-de word" syntax, not a bare word.
+  - name: lingva
+    engine: lingva
+    shortcut: lv
+    disabled: true
+
+  # --- Replacements, all verified relevant AND reliable over repeat runs ---
+
+  # Package registries (crates.io !crates, npm !npm, pkg.go.dev !pgo, alpine
+  # !alp, packagist !pack, hex !hex) were trialled here as enabled and then
+  # DELIBERATELY LEFT DISABLED — upstream's default, and it is correct.
+  #
+  # They answer accurately when asked directly (10/10 to 50/50 relevant by
+  # bang), but each only knows its own language's index, so it always returns
+  # *something* regardless of the query. Blended into a category search that
+  # ranks Elixir and Rust packages above the actual answer: measured
+  # "docker compose healthcheck syntax" -> 9 of the top 10 results were
+  # irrelevant hex/crates packages, and "postgres explain analyze slow query"
+  # the same. That is the exact pollution this audit set out to remove, so
+  # they are reachable by bang only. Do not enable them for category search.
+
+  # software wikis: replaces arch linux wiki.
+  - name: free software directory
+    engine: mediawiki
+    shortcut: fsd
+    disabled: false
+
+  - name: wikibooks
+    engine: mediawiki
+    shortcut: wb
+    disabled: false
+
+  # it/news: Hacker News is strong for technical discussion and unaffected
+  # by any of the bot walls above.
+  - name: hackernews
+    engine: hackernews
+    shortcut: hn
+    disabled: false
+
+  # music: replaces bandcamp.
+  - name: deezer
+    engine: deezer
+    shortcut: dz
+    disabled: false
+
+  # videos: brave.videos and vimeo are persistently blocked from these
+  # exits, so add sources that are not.
+  - name: peertube
+    engine: peertube
+    shortcut: ptb
+    disabled: false
+
+  - name: odysee
+    engine: odysee
+    shortcut: od
+    disabled: false
+
+  # files: replaces solidtorrents and kickass (kickass 403s persistently).
+  - name: btdigg
+    engine: btdigg
+    shortcut: bt
+    disabled: false
+
+  - name: nyaa
+    engine: nyaa
+    shortcut: nt
+    disabled: false
+
+  # science: crossref and openalex are open scholarly indexes, no bot walls.
+  - name: crossref
+    engine: crossref
+    shortcut: cr
+    disabled: false
+
+  - name: openalex
+    engine: openalex
+    shortcut: oa
+    disabled: false
+
+  # dictionaries: replaces etymonline.
+  - name: duden
+    engine: duden
+    shortcut: du
+    disabled: false
+
+  # icons: 325/325 relevant, complements devicons/lucide.
+  - name: material icons
+    engine: material_icons
+    shortcut: mi
+    disabled: false
+
+  # NOT changed, deliberately: openstreetmap, vimeo, genius, reuters,
+  # google news, startpage images/news, unsplash, deviantart, kickass and
+  # brave.{images,videos,news} all fail LOUDLY here (403/429/CAPTCHA), so
+  # SearXNG reports them unresponsive rather than merging bad data. They
+  # cost coverage, not correctness, and they self-recover — unlike bing,
+  # which silently poisoned the ranking. Left enabled on purpose.
+  #
+  # Also unchanged: `photon` covers map queries while osm is blocked, and
+  # bing images/videos/news are measurably fine (34/49, 30/30, 10/10).
