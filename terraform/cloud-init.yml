@@ -12,8 +12,25 @@ write_files:
   - path: /opt/searxng/deploy-marker
     content: |
       Provisioned by cloud-init. Stack deployed via scripts/deploy.sh after first boot.
+  # apt-daily is Type=oneshot with no start timeout, so a stalled fetch holds the apt lock forever and
+  # silently stops unattended-upgrades (observed: hung for 5.5 months).
+  - path: /etc/systemd/system/apt-daily.service.d/timeout.conf
+    content: |
+      [Service]
+      TimeoutStartSec=1h
+  # Unattended-upgrades only takes Ubuntu origins by default; Docker comes from its own repo. Tailscale is kept
+  # current by its own auto-updater (runcmd below). 03:00 avoids Watchtower (04:00) and exit rotation (02/10/18).
+  - path: /etc/apt/apt.conf.d/51custom-unattended-upgrades
+    content: |
+      Unattended-Upgrade::Origins-Pattern {
+          "origin=Docker,archive=${distro_codename}";
+      };
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "03:00";
 
 runcmd:
+  - systemctl daemon-reload
+
   # Install Docker
   - install -m 0755 -d /etc/apt/keyrings
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
@@ -26,6 +43,7 @@ runcmd:
 
   # Install Tailscale
   - curl -fsSL https://tailscale.com/install.sh | sh
+  - tailscale set --auto-update
 
   # Create compose directory
   - mkdir -p /opt/searxng

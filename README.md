@@ -38,7 +38,8 @@ Search traffic exits through a pool of three Gluetun HTTP-proxy containers, each
 different Mullvad WireGuard exit. SearXNG's `outgoing.proxies` list round-robins across them via
 httpx, one exit per request. Tailscale Serve provides auto-managed TLS certificates. Caddy
 reverse-proxies and strips identifying headers. Watchtower auto-updates container images daily
-at 04:00.
+at 04:00. On the host, unattended-upgrades installs Ubuntu and Docker updates and reboots at 03:00 when a kernel
+update needs it; Tailscale updates itself.
 
 No ports are exposed to the public internet except SSH (port 22), which is intended to be removed
 once Tailscale SSH is confirmed working.
@@ -94,7 +95,7 @@ Fill in:
 | `WIREGUARD_ADDRESSES_C`     | Mullvad WireGuard config C (IPv4 address)             |
 | `VPN_SERVER_COUNTRIES`      | Comma-separated list (e.g. `Sweden,Switzerland,Netherlands`) |
 | `SEARXNG_SECRET_KEY`        | Generate on-instance: `openssl rand -hex 32`          |
-| `TAILSCALE_AUTHKEY`         | Tailscale admin console > Settings > Keys             |
+| `TAILSCALE_AUTHKEY`         | Tailscale admin console > Settings > Keys; attach `tag:server` (tagged nodes never key-expire) |
 | `BETTERSTACK_HEARTBEAT_URL` | Better Stack > Heartbeats > create heartbeat          |
 
 Three separate Mullvad WireGuard configs are required — one per exit. Generate each at the
@@ -132,6 +133,9 @@ https://searxng.<tailnet>.ts.net/
 ```
 
 ### 6. Health Check Cron (Optional)
+
+The heartbeat is sent only when SearXNG answers *and* apt has refreshed its package lists within the last two
+days, so a stalled OS-update pipeline alerts the same way an outage does.
 
 Install the heartbeat cron job on the instance:
 
