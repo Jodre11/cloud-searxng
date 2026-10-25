@@ -109,8 +109,12 @@ resource "oci_core_instance" "searxng" {
     user_data           = base64encode(file("${path.module}/cloud-init.yml"))
   }
 
-  # cloud-init only runs on first boot; editing it must not recreate the running instance.
+  # cloud-init only runs on first boot, and the image data source always resolves to the newest Ubuntu build;
+  # neither may recreate the running instance, whose /opt/searxng/.env exists only on its boot volume.
   lifecycle {
-    ignore_changes = [metadata["user_data"]]
+    ignore_changes = [
+      metadata["user_data"],
+      source_details[0].source_id,
+    ]
   }
 }
