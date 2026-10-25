@@ -16,7 +16,7 @@ jobs:
     name: trivy config
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Run Trivy config scan
         uses: aquasecurity/trivy-action@v0.36.0
