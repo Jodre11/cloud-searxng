@@ -108,4 +108,9 @@ resource "oci_core_instance" "searxng" {
     ssh_authorized_keys = file(pathexpand(var.ssh_public_key_path))
     user_data           = base64encode(file("${path.module}/cloud-init.yml"))
   }
+
+  # cloud-init only runs on first boot; editing it must not recreate the running instance.
+  lifecycle {
+    ignore_changes = [metadata["user_data"]]
+  }
 }
