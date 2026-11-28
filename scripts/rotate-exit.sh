@@ -3,18 +3,27 @@
 #
 # Unlike the old single-tunnel setup, searxng no longer shares a gluetun netns
 # (it reaches the pool over the internal Docker network via outgoing.proxies),
-# so rotating one proxy does NOT require a searxng restart. httpx sees
-# connection-refused on that one proxy for ~10s and keeps using the others.
+# so rotating one proxy does NOT require a searxng restart. Requests routed to
+# that proxy fail for ~10s (retried on the next proxy where the engine sets
+# `retries`); the others keep serving.
 #
 # Usage: rotate-exit.sh <gluetun-a|gluetun-b|gluetun-c>
 #
-# Install via staggered cron on the VM (each exit refreshes once/24h, 8h apart):
-#   0  2 * * *  /opt/searxng/scripts/rotate-exit.sh gluetun-a >> /var/log/searxng-rotate.log 2>&1
-#   0 10 * * *  /opt/searxng/scripts/rotate-exit.sh gluetun-b >> /var/log/searxng-rotate.log 2>&1
-#   0 18 * * *  /opt/searxng/scripts/rotate-exit.sh gluetun-c >> /var/log/searxng-rotate.log 2>&1
+# Install via staggered cron in the ubuntu user's crontab (each exit refreshes once/24h, 8h apart):
+#   0  2 * * *  /opt/searxng/scripts/rotate-exit.sh gluetun-a
+#   0 10 * * *  /opt/searxng/scripts/rotate-exit.sh gluetun-b
+#   0 18 * * *  /opt/searxng/scripts/rotate-exit.sh gluetun-c
+#
+# The script appends to its own log (ROTATE_LOG, default /opt/searxng/logs/rotate-exit.log). Do not redirect
+# to /var/log in the cron line: it is root:syslog 775, so for the ubuntu user the shell fails to open the file
+# and cron never starts the script. That is how rotation silently never ran (found 2026-11-28).
 set -euo pipefail
 
 CONTAINER="${1:?Usage: rotate-exit.sh <gluetun-a|gluetun-b|gluetun-c>}"
+ROTATE_LOG="${ROTATE_LOG:-/opt/searxng/logs/rotate-exit.log}"
+
+mkdir -p "$(dirname "$ROTATE_LOG")"
+exec >>"$ROTATE_LOG" 2>&1
 
 log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $*"; }
 

@@ -28,15 +28,15 @@ Tailscale (HTTPS)                  OCI VM.Standard.A1.Flex (ARM, 4 OCPU, 24 GB)
        ▼
   Tailscale Serve (:443)  ──►  Caddy (:8888)  ──►  SearXNG (:8080)
                                                          │
-                                   searxng ──▶ outgoing.proxies (httpx round-robin, per request)
+                                   searxng ──▶ outgoing.proxies (round-robin, per request)
                                                  ├─▶ gluetun-a  HTTP proxy  ─▶ Mullvad exit 1
                                                  ├─▶ gluetun-b  HTTP proxy  ─▶ Mullvad exit 2
                                                  └─▶ gluetun-c  HTTP proxy  ─▶ Mullvad exit 3
 ```
 
 Search traffic exits through a pool of three Gluetun HTTP-proxy containers, each pinned to a
-different Mullvad WireGuard exit. SearXNG's `outgoing.proxies` list round-robins across them via
-httpx, one exit per request. Tailscale Serve provides auto-managed TLS certificates. Caddy
+different Mullvad WireGuard exit. SearXNG's `outgoing.proxies` list round-robins across them, one
+exit per request (and per retry). Tailscale Serve provides auto-managed TLS certificates. Caddy
 reverse-proxies and strips identifying headers. Watchtower auto-updates container images daily
 at 04:00. On the host, unattended-upgrades installs Ubuntu and Docker updates and reboots at 03:00 when a kernel
 update needs it; Tailscale updates itself.
@@ -134,13 +134,15 @@ https://searxng.<tailnet>.ts.net/
 
 ### 6. Health Check Cron (Optional)
 
-The heartbeat is sent only when SearXNG answers *and* apt has refreshed its package lists within the last two
-days, so a stalled OS-update pipeline alerts the same way an outage does.
+The heartbeat is sent only when a general search is answered by at least two web engines (`MIN_ENGINES`) *and*
+apt has refreshed its package lists within the last two days, so a blocked exit pool or a stalled OS-update
+pipeline alerts the same way an outage does. Each check is a real search, so it runs every 10 minutes; set the
+Better Stack heartbeat's period to match (10 minutes, with a grace period of at least 10 more).
 
 Install the heartbeat cron job on the instance:
 
 ```bash
-sudo crontab -l 2>/dev/null | { cat; echo '*/3 * * * * BETTERSTACK_HEARTBEAT_URL="<url>" /opt/searxng/scripts/health-check.sh'; } | sudo crontab -
+sudo crontab -l 2>/dev/null | { cat; echo '*/10 * * * * BETTERSTACK_HEARTBEAT_URL="<url>" /opt/searxng/scripts/health-check.sh'; } | sudo crontab -
 ```
 
 ### 7. VPN Exit Rotation Cron (Recommended)
@@ -152,12 +154,23 @@ shared Mullvad exit IPs; when tripped, SearXNG locally suspends that engine for 
 fresh exit by restarting a named Gluetun container. Exits refresh once per 24h, 8h apart, so at
 most one is mid-rotation at any instant and the pool is never more than 1/3 degraded.
 
+Install it in the `ubuntu` user's crontab (not root's). The script appends to
+`/opt/searxng/logs/rotate-exit.log` itself, so the cron lines carry no redirection:
+
 ```bash
 crontab -l 2>/dev/null | { cat; \
-  echo '0  2 * * * /opt/searxng/scripts/rotate-exit.sh gluetun-a >> /var/log/searxng-rotate.log 2>&1'; \
-  echo '0 10 * * * /opt/searxng/scripts/rotate-exit.sh gluetun-b >> /var/log/searxng-rotate.log 2>&1'; \
-  echo '0 18 * * * /opt/searxng/scripts/rotate-exit.sh gluetun-c >> /var/log/searxng-rotate.log 2>&1'; \
+  echo '0  2 * * * /opt/searxng/scripts/rotate-exit.sh gluetun-a'; \
+  echo '0 10 * * * /opt/searxng/scripts/rotate-exit.sh gluetun-b'; \
+  echo '0 18 * * * /opt/searxng/scripts/rotate-exit.sh gluetun-c'; \
 } | crontab -
+```
+
+An older version of this section redirected to `/var/log/searxng-rotate.log`. `ubuntu` cannot create files in
+`/var/log`, so cron failed before the script started and rotation never ran. If your crontab has those lines,
+remove the redirection:
+
+```bash
+crontab -l | sed 's| >> /var/log/searxng-rotate.log 2>&1||' | crontab -
 ```
 
 ## Access
