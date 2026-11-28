@@ -11,6 +11,20 @@ search:
   formats:
     - html
     - json
+  # Suspension is per ENGINE, not per exit: one CAPTCHA from any exit benches
+  # the engine for every exit, so upstream's 1h CAPTCHA default let the worst
+  # exit set availability for the whole pool. Shortened so a single bad exit
+  # costs minutes. Engines also retry on another exit first (see `retries`
+  # below), so a suspension now means every attempted exit failed. The
+  # Cloudflare/reCAPTCHA keys keep upstream's values: those blocks are
+  # deliberate and long-lived, and hammering them only extends them.
+  suspended_times:
+    SearxEngineAccessDenied: 120
+    SearxEngineCaptcha: 600
+    SearxEngineTooManyRequests: 60
+    cf_SearxEngineCaptcha: 1296000
+    cf_SearxEngineAccessDenied: 86400
+    recaptcha_SearxEngineCaptcha: 604800
 
 server:
   secret_key: "${SEARXNG_SECRET_KEY}"
@@ -37,10 +51,10 @@ outgoing:
   request_timeout: 6.0
   max_request_timeout: 10.0
   pool_connections: 100
-  pool_maxsize: 20
-  # Distribute outgoing engine requests across the gluetun proxy pool. httpx
-  # round-robins the list per request, so a concurrent research burst spreads
-  # across 3 Mullvad exit IPs instead of hammering one.
+  # Distribute outgoing engine requests across the gluetun proxy pool. Each
+  # engine's network round-robins the list per request (and per retry), so a
+  # concurrent research burst spreads across 3 Mullvad exit IPs instead of
+  # hammering one.
   proxies:
     all://:
       - http://gluetun-a:8888
@@ -100,6 +114,12 @@ engines:
   # because SearXNG's score multiplies by the number of engines agreeing on a
   # result — independent agreement is a real quality signal, whereas several
   # front-ends onto one index would just amplify a single provider's opinion.
+  #
+  # `retries` + `retry_on_http_error`: each attempt takes the NEXT proxy from
+  # the engine's round-robin (searx/network/network.py `call_client` ->
+  # `get_client` -> `next(_proxies_cycle)`), so a 403/429 from one exit is
+  # retried on another before the engine is suspended. It does not help with
+  # CAPTCHA pages served as HTTP 200; those are detected after the response.
 
   # DuckDuckGo's HTML endpoint. Distinct from the `duckduckgo` engine below:
   # that one uses the JSON API and gets 403d on these exits, while this one is
@@ -109,6 +129,8 @@ engines:
     engine: duckduckgo_web
     shortcut: ddgw
     weight: 1.5
+    retries: 2
+    retry_on_http_error: [403, 429]
     disabled: false
 
   # Google results via the Programmable Search JSON path — reaches Google's
@@ -119,20 +141,27 @@ engines:
     engine: google_cse
     shortcut: goc
     weight: 1.5
+    retries: 2
+    retry_on_http_error: [403, 429]
     disabled: false
 
-  # Scored 56/56, ~18 results/run, 15 distinct hosts.
+  # Disabled 2026-11-28: 100% SearxEngineResponseException on every request
+  # (a parse crash in the engine, not a block). Scored 56/56 when it worked;
+  # re-test with !reh after an image update.
   - name: resulthunter
     engine: resulthunter
     shortcut: reh
     weight: 1.2
-    disabled: false
+    disabled: true
 
-  # Scored 29/30.
+  # Scored 29/30. 2026-11-28: 429 on most requests, and a per-exit probe saw
+  # 429 from fresh exits too, so its limit is not keyed on our IP alone.
   - name: privacywall
     engine: privacywall
     shortcut: pw
     weight: 1.0
+    retries: 2
+    retry_on_http_error: [403, 429]
     disabled: false
 
   # Scored 30/30.
@@ -140,6 +169,8 @@ engines:
     engine: gmx
     shortcut: gmx
     weight: 1.0
+    retries: 2
+    retry_on_http_error: [403, 429]
     disabled: false
 
   # Scored 27/30. Czech index — adds genuinely different coverage.
@@ -147,43 +178,71 @@ engines:
     engine: seznam
     shortcut: szn
     weight: 0.9
+    retries: 2
+    retry_on_http_error: [403, 429]
     disabled: false
 
-  # Scored 27/27.
+  # Disabled 2026-11-28: 100% access denied, and a per-exit probe got a 403
+  # CAPTCHA page from all 8 Mullvad exits tried across 7 providers. The whole
+  # Mullvad range is blocked, so rotation cannot fix it.
   - name: zapmeta
     engine: xpath
     shortcut: zpm
     weight: 0.9
-    disabled: false
+    disabled: true
 
   # dogpile and searchtoday both scored ~0.96 but overlap each other (Jaccard
-  # 0.52), so only dogpile is enabled — searchtoday would mostly duplicate its
-  # votes. infospace shares searchtoday's `s1search` engine and is left off for
-  # the same reason. Any of them can still be reached by bang (!std, !ifs).
+  # 0.52), so dogpile was the one enabled and searchtoday would mostly
+  # duplicate its votes. infospace shares searchtoday's `s1search` engine and
+  # is left off for the same reason. Any of them can be reached by bang (!std,
+  # !ifs).
+  #
+  # Upstream made dogpile `inactive: true` on 2026-08-12 (later commits added
+  # an API token and CORS headers), and our entry inherited that, so dogpile
+  # has silently been off since. `inactive: false` loads it again, and
+  # `disabled: true` keeps it out of category search until `!dog` is
+  # re-measured from this instance.
   - name: dogpile
     engine: dogpile
     shortcut: dog
     weight: 0.9
-    disabled: false
+    retries: 2
+    retry_on_http_error: [403, 429]
+    inactive: false
+    disabled: true
 
   # --- Kept enabled: intermittent but LOUD when they fail ---
-  # Both 403/429 on these exits much of the time. That is acceptable because
-  # the failure is reported rather than silently poisoning results, and when
-  # they do answer the results are good. They also self-recover.
+  # 403/429/CAPTCHA on these exits much of the time. That is acceptable
+  # because the failure is reported rather than silently poisoning results,
+  # and when it answers the results are good. It also self-recovers.
   - name: duckduckgo
     engine: duckduckgo
     shortcut: d
     weight: 1.0
+    retries: 2
+    retry_on_http_error: [403, 429]
 
+  # Upstream disabled Brave web on 2026-11-20 because its result URLs are now
+  # cloaked (searxng #6971), which makes it QUIET-class. Measured here on
+  # 2026-11-28 by bang: 0 results on 3/3 queries ("Brave data payload not
+  # found"). Pinned explicitly so a future upstream flip does not re-enable it
+  # unmeasured. brave.images/videos/news are separate entries and unaffected.
   - name: brave
     engine: brave
     shortcut: br
     weight: 1.0
+    disabled: true
 
+  # Upstream now refuses to load wikipedia without `general.contact_url`,
+  # which it sends to Wikimedia in the User-Agent (searxng #6870, 2026-11-12).
+  # Not set here: it would attach an identity to requests that otherwise
+  # leave through anonymous VPN exits. `inactive` documents that this entry
+  # is off on purpose, rather than leaving a load error at every startup.
   - name: wikipedia
     engine: wikipedia
     shortcut: wp
     weight: 0.8
+    inactive: true
 
   - name: github
     engine: github
@@ -200,8 +259,9 @@ engines:
   # (WDQS) blocks any User-Agent starting with "SearXNG/" — the stock Docker
   # image's default UA. Not a VPN issue (reproduces without a proxy) and no
   # config workaround exists: useragent_suffix only appends, can't change the
-  # blocked prefix. Upstream fix (caching init data) is unreleased. See
-  # searxng/searxng#6454. Wikipedia already covers the encyclopedic case.
+  # blocked prefix. See searxng/searxng#6454. Upstream's fix (#6870) sends a
+  # valid User-Agent only when `general.contact_url` is set, the same trade-off
+  # that keeps wikipedia off above.
   # NOTE: `inactive` (not `disabled`) — only `inactive` skips engine init();
   # `disabled` still runs init(), which re-triggers the 403 on every startup.
   - name: wikidata
@@ -368,12 +428,19 @@ engines:
     shortcut: mi
     disabled: false
 
-  # NOT changed, deliberately: openstreetmap, vimeo, genius, reuters,
+  # Like wikipedia, upstream's OSM engine now refuses to load without
+  # `general.contact_url` (Nominatim's usage policy wants an identifying
+  # User-Agent). Off for the same reason; `photon` covers map queries.
+  - name: openstreetmap
+    engine: openstreetmap
+    shortcut: osm
+    inactive: true
+
+  # NOT changed, deliberately: vimeo, genius, reuters,
   # google news, startpage images/news, unsplash, deviantart, kickass and
   # brave.{images,videos,news} all fail LOUDLY here (403/429/CAPTCHA), so
   # SearXNG reports them unresponsive rather than merging bad data. They
   # cost coverage, not correctness, and they self-recover — unlike bing,
   # which silently poisoned the ranking. Left enabled on purpose.
   #
-  # Also unchanged: `photon` covers map queries while osm is blocked, and
-  # bing images/videos/news are measurably fine (34/49, 30/30, 10/10).
+  # Also unchanged: bing images/videos/news are measurably fine (34/49, 30/30, 10/10).
