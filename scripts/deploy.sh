@@ -10,7 +10,9 @@ COMPOSE_DIR="$(cd "$SCRIPT_DIR/../compose" && pwd)"
 REMOTE_DIR="/opt/searxng"
 
 echo "Syncing compose files to ${HOST}:${REMOTE_DIR}..."
-rsync -avz --exclude='.env.example' \
+# --inplace keeps each file's inode. settings.yml, the plugin and the Caddyfile are single-file bind mounts,
+# which pin the inode they were started with; rsync's default write-and-rename leaves containers on the old file.
+rsync -avz --inplace --exclude='.env.example' \
     "${COMPOSE_DIR}/" \
     "ubuntu@${HOST}:${REMOTE_DIR}/"
 
@@ -29,6 +31,12 @@ fi
 echo "Starting stack..."
 # shellcheck disable=SC2029
 ssh "ubuntu@${HOST}" "cd ${REMOTE_DIR} && docker compose up -d"
+
+# `up -d` does not recreate a container when only a mounted file's contents changed, and neither SearXNG nor
+# Caddy reloads its config on its own, so restart both to apply settings.yml, the plugin and the Caddyfile.
+echo "Restarting searxng and caddy to load config..."
+# shellcheck disable=SC2029
+ssh "ubuntu@${HOST}" "cd ${REMOTE_DIR} && docker compose restart searxng caddy"
 
 echo "Waiting for health checks..."
 sleep 15
