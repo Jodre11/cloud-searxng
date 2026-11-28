@@ -104,7 +104,7 @@ engines:
   #
   #   LOUD  — 403/429/CAPTCHA. Engine reports an error, SearXNG marks it
   #           unresponsive, results are merely missing. brave, duckduckgo,
-  #           startpage, qwant, mojeek, yahoo, yep all do this here.
+  #           startpage, qwant, yahoo, yep all do this here.
   #   QUIET — HTTP 200 with a plausible-looking page that is not our search.
   #           Nothing is logged, `unresponsive_engines` stays empty, and the
   #           junk is merged into the ranking as if it were good. Far worse.
@@ -266,6 +266,55 @@ engines:
     shortcut: br
     weight: 1.0
     disabled: true
+
+  # --- Added 2026-11-28 after measuring 48 upstream general engines by bang ---
+  # Each scored >=4/5 relevant top-5 on five query shapes, and the blended
+  # general search with all seven on scored 60/60 relevant top-10 across six
+  # queries (1.5-4.4 s). Upstream ships them inactive or disabled, so both
+  # flags are pinned. Measured and left off (reachable by bang where loaded):
+  #   blocked or broken from Mullvad: findborg, iseek, fastbot, tusksearch,
+  #     searchmysite, swisscows, qwant, startpage (CAPTCHA), yep, unobtanium,
+  #     gabanza (TLS), searchzee, zoo search, yahoo (parse), neosearch, ayo,
+  #     reloado (crash), littlelayer;
+  #   timeouts: searchrockit, seekninja, yacy, vuhuv;
+  #   need an API key: jina, marginalia;
+  #   empty or irrelevant: luxxle, crowdview, kukei, avalw, xonaly,
+  #     neocities, encyclosearch, wiby, kavunka demo, tiger;
+  #   niche indexes that would dilute blended results (good by bang): rawweb,
+  #     mwmbl, cl0q, readerfunded, boardreader;
+  #   metacrawler: the same System1 index as s1search, and it 403'd after one
+  #     query.
+  - name: xprivo
+    inactive: false
+    disabled: false
+
+  - name: keenable
+    inactive: false
+    disabled: false
+
+  # Was LOUD-blocked here in July; 25/25 on 2026-11-28.
+  - name: mojeek
+    inactive: false
+    disabled: false
+
+  - name: yandex
+    inactive: false
+    disabled: false
+
+  # System1 index (the one behind dogpile, which is 403'd here). Returns 4
+  # results per page, all relevant.
+  - name: s1search
+    inactive: false
+    disabled: false
+
+  # Smaller independent indexes; each added a relevant result the others missed.
+  - name: purili
+    inactive: false
+    disabled: false
+
+  - name: fynd
+    inactive: false
+    disabled: false
 
   # Upstream now refuses to load wikipedia without `general.contact_url`,
   # which it sends to Wikimedia in the User-Agent (searxng #6870, 2026-11-12).
