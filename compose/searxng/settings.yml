@@ -523,10 +523,13 @@ engines:
 
   # Like wikipedia, upstream's OSM engine refuses to load without
   # `general.contact_url`. It only checks that one is set; its requests keep the
-  # normal browser User-Agent.
+  # normal browser User-Agent. Each search makes two requests: Nominatim
+  # (under 1 s through every exit) and then a Wikidata SPARQL query for
+  # images, which pushed it past the 6 s default on 3 of 3 queries.
   - name: openstreetmap
     engine: openstreetmap
     shortcut: osm
+    timeout: 10.0
     inactive: false
 
   # NOT changed, deliberately: vimeo, genius, reuters,
