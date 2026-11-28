@@ -95,6 +95,7 @@ Fill in:
 | `WIREGUARD_ADDRESSES_C`     | Mullvad WireGuard config C (IPv4 address)             |
 | `VPN_SERVER_COUNTRIES`      | Comma-separated list (e.g. `Sweden,Switzerland,Netherlands`) |
 | `SEARXNG_SECRET_KEY`        | Generate on-instance: `openssl rand -hex 32`          |
+| `SEARXNG_CONTACT_URL`       | `mailto:` a forwarding alias (e.g. iCloud Hide My Email); sent to Wikimedia in the User-Agent, required by wikipedia, wikidata and openstreetmap |
 | `TAILSCALE_AUTHKEY`         | Tailscale admin console > Settings > Keys; attach `tag:server` (tagged nodes never key-expire) |
 | `BETTERSTACK_HEARTBEAT_URL` | Better Stack > Heartbeats > create heartbeat          |
 

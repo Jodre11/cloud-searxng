@@ -116,6 +116,8 @@ services:
     environment:
       # SearXNG reads server.secret_key from SEARXNG_SECRET; settings.yml values are not env-expanded.
       - SEARXNG_SECRET=${SEARXNG_SECRET_KEY}
+      # general.contact_url; kept in .env so the address stays out of this public repo.
+      - SEARXNG_CONTACT_URL=${SEARXNG_CONTACT_URL:?Set SEARXNG_CONTACT_URL in .env}
     cap_drop:
       - ALL
     cap_add:

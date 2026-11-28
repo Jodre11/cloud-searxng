@@ -3,6 +3,10 @@ use_default_settings: true
 general:
   debug: false
   instance_name: "cloud-searxng"
+  # contact_url comes from env SEARXNG_CONTACT_URL (a forwarding alias kept in
+  # .env, out of this public repo). Wikipedia and Wikidata send it in their
+  # User-Agent, and wikipedia, wikidata and openstreetmap refuse to load
+  # without it (searxng #6870).
 
 search:
   safe_search: 0
@@ -55,6 +59,11 @@ outgoing:
   request_timeout: 6.0
   max_request_timeout: 10.0
   pool_connections: 100
+  # Engines that send a "SearXNG/<version> <suffix>" User-Agent (keenable,
+  # photon, unsplash and others) fall back to general.contact_url when this is
+  # empty. A neutral suffix keeps the contact address to the Wikimedia engines,
+  # which pass it explicitly.
+  useragent_suffix: "(private instance)"
   # Distribute outgoing engine requests across the gluetun proxy pool. Each
   # engine's network round-robins the list per request (and per retry), so a
   # concurrent research burst spreads across 3 Mullvad exit IPs instead of
@@ -326,16 +335,13 @@ engines:
     inactive: false
     disabled: false
 
-  # Upstream now refuses to load wikipedia without `general.contact_url`,
-  # which it sends to Wikimedia in the User-Agent (searxng #6870, 2026-11-12).
-  # Not set here: it would attach an identity to requests that otherwise
-  # leave through anonymous VPN exits. `inactive` documents that this entry
-  # is off on purpose, rather than leaving a load error at every startup.
+  # Needs `general.contact_url` (see `general` above). `inactive: false`
+  # overrides the `inactive: true` this entry carried while it was unset.
   - name: wikipedia
     engine: wikipedia
     shortcut: wp
     weight: 0.8
-    inactive: true
+    inactive: false
 
   - name: github
     engine: github
@@ -348,18 +354,12 @@ engines:
     engine: startpage
     disabled: true
 
-  # Wikidata's init SPARQL query to query.wikidata.org 403s because Wikimedia
-  # (WDQS) blocks any User-Agent starting with "SearXNG/" — the stock Docker
-  # image's default UA. Not a VPN issue (reproduces without a proxy) and no
-  # config workaround exists: useragent_suffix only appends, can't change the
-  # blocked prefix. See searxng/searxng#6454. Upstream's fix (#6870) sends a
-  # valid User-Agent only when `general.contact_url` is set, the same trade-off
-  # that keeps wikipedia off above.
-  # NOTE: `inactive` (not `disabled`) — only `inactive` skips engine init();
-  # `disabled` still runs init(), which re-triggers the 403 on every startup.
+  # Wikimedia's query service 403s a bare "SearXNG/<version>" User-Agent
+  # (searxng #6454). Upstream's fix (#6870) appends `general.contact_url`, which
+  # is now set, so the init SPARQL query is accepted.
   - name: wikidata
     engine: wikidata
-    inactive: true
+    inactive: false
 
   # Default-settings engines we don't use that fail to init on this box and only
   # add startup log noise: ahmia/torch are Tor onion engines (no tor proxy here),
@@ -521,13 +521,13 @@ engines:
     shortcut: mi
     disabled: false
 
-  # Like wikipedia, upstream's OSM engine now refuses to load without
-  # `general.contact_url` (Nominatim's usage policy wants an identifying
-  # User-Agent). Off for the same reason; `photon` covers map queries.
+  # Like wikipedia, upstream's OSM engine refuses to load without
+  # `general.contact_url`. It only checks that one is set; its requests keep the
+  # normal browser User-Agent.
   - name: openstreetmap
     engine: openstreetmap
     shortcut: osm
-    inactive: true
+    inactive: false
 
   # NOT changed, deliberately: vimeo, genius, reuters,
   # google news, startpage images/news, unsplash, deviantart, kickass and
