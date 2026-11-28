@@ -134,15 +134,19 @@ https://searxng.<tailnet>.ts.net/
 
 ### 6. Health Check Cron (Optional)
 
-The heartbeat is sent only when a general search is answered by at least two web engines (`MIN_ENGINES`) *and*
-apt has refreshed its package lists within the last two days, so a blocked exit pool or a stalled OS-update
-pipeline alerts the same way an outage does. Each check is a real search, so it runs every 10 minutes; set the
-Better Stack heartbeat's period to match (10 minutes, with a grace period of at least 10 more).
+The heartbeat is sent only when real searches are being answered *and* apt has refreshed its package lists within
+the last two days, so a blocked exit pool or a stalled OS-update pipeline alerts the same way an outage does.
+
+The `exit_health` plugin records which engines answered each search. The check passes when at least half of the
+last six category searches got results from two or more web engines (`MIN_ENGINES`, `SAMPLE_SIZE`). The check
+sends no traffic of its own, with two exceptions. After six idle hours (`IDLE_PROBE_AFTER`) it runs one test
+search, and while unhealthy it retries every 30 minutes (`RECHECK_AFTER`), so recovery is still noticed when
+nobody is searching.
 
 Install the heartbeat cron job on the instance:
 
 ```bash
-sudo crontab -l 2>/dev/null | { cat; echo '*/10 * * * * BETTERSTACK_HEARTBEAT_URL="<url>" /opt/searxng/scripts/health-check.sh'; } | sudo crontab -
+sudo crontab -l 2>/dev/null | { cat; echo '*/3 * * * * BETTERSTACK_HEARTBEAT_URL="<url>" /opt/searxng/scripts/health-check.sh'; } | sudo crontab -
 ```
 
 ### 7. VPN Exit Rotation Cron (Recommended)
@@ -189,7 +193,8 @@ cloud-searxng/
 │   ├── .env.example              # Template for instance .env
 │   ├── docker-compose.yml        # Gluetun + SearXNG + Caddy + Watchtower
 │   ├── caddy/Caddyfile           # Reverse proxy config
-│   └── searxng/settings.yml      # SearXNG engine and UI settings
+│   ├── searxng/settings.yml      # SearXNG engine and UI settings
+│   └── searxng/plugins/          # Local plugin recording engine health per search
 ├── scripts/
 │   ├── deploy.sh                 # Rsync + docker compose up
 │   ├── env.sh                    # Load OCI creds from Bitwarden

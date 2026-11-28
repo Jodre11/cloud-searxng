@@ -108,6 +108,7 @@ services:
         condition: service_healthy
     volumes:
       - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - ./searxng/plugins/exit_health.py:/usr/local/searxng/searx/plugins/exit_health.py:ro
     environment:
       # SearXNG reads server.secret_key from SEARXNG_SECRET; settings.yml values are not env-expanded.
       - SEARXNG_SECRET=${SEARXNG_SECRET_KEY}
