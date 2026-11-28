@@ -21,7 +21,8 @@ if typing.TYPE_CHECKING:
 
     from . import PluginCfg
 
-RECORD_PATH = "/var/cache/searxng/exit-health.jsonl"
+# A tmpfs mounted by docker-compose.yml; records do not need to survive a restart.
+RECORD_PATH = "/run/exit-health/records.jsonl"
 MAX_BYTES = 256 * 1024
 
 

@@ -109,6 +109,10 @@ services:
     volumes:
       - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
       - ./searxng/plugins/exit_health.py:/usr/local/searxng/searx/plugins/exit_health.py:ro
+    # Records written by the exit_health plugin. The worker runs as root with every capability dropped (no
+    # DAC_OVERRIDE), so it cannot write into the image's searxng-owned directories; a 1777 tmpfs it can.
+    tmpfs:
+      - /run/exit-health:mode=1777,size=4m
     environment:
       # SearXNG reads server.secret_key from SEARXNG_SECRET; settings.yml values are not env-expanded.
       - SEARXNG_SECRET=${SEARXNG_SECRET_KEY}
