@@ -98,6 +98,7 @@ Fill in:
 | `SEARXNG_CONTACT_URL`       | `mailto:` a forwarding alias (e.g. iCloud Hide My Email); sent to Wikimedia in the User-Agent, required by wikipedia, wikidata and openstreetmap |
 | `TAILSCALE_AUTHKEY`         | Tailscale admin console > Settings > Keys; attach `tag:server` (tagged nodes never key-expire) |
 | `BETTERSTACK_HEARTBEAT_URL` | Better Stack > Heartbeats > create heartbeat          |
+| `BETTERSTACK_ENGINES_HEARTBEAT_URL` | A second heartbeat: expected every 1 hour, for `engine-health.sh` |
 
 Three separate Mullvad WireGuard configs are required — one per exit. Generate each at the
 Mullvad account WireGuard-config page; do not reuse one key across tunnels.
@@ -144,10 +145,20 @@ sends no traffic of its own, with two exceptions. After six idle hours (`IDLE_PR
 search, and while unhealthy it retries every 30 minutes (`RECHECK_AFTER`), so recovery is still noticed when
 nobody is searching.
 
-Install the heartbeat cron job on the instance:
+That check alerts only when search as a whole collapses, so `engine-health.sh` watches each engine separately from
+the same records. An engine that answered none of the last 20 searches it was queried in (`WINDOW`) is reported
+to a second heartbeat's `/fail` URL. The per-engine table is attached to the incident, and success pings resume
+once the engine answers again or is disabled. Engines that only answer when a query suits them, such as wikipedia or currency,
+are judged only on errors. A disabled engine stops being judged once it no longer appears in recent searches. The
+latest table is always in `/opt/searxng/logs/engine-health.txt`.
+
+Install both in the `ubuntu` user's crontab:
 
 ```bash
-sudo crontab -l 2>/dev/null | { cat; echo '*/3 * * * * BETTERSTACK_HEARTBEAT_URL="<url>" /opt/searxng/scripts/health-check.sh'; } | sudo crontab -
+crontab -l 2>/dev/null | { cat; \
+  echo '*/3 * * * * set -a; . /opt/searxng/.env; set +a; /opt/searxng/scripts/health-check.sh'; \
+  echo '7 * * * * set -a; . /opt/searxng/.env; set +a; /opt/searxng/scripts/engine-health.sh'; \
+} | crontab -
 ```
 
 ### 7. VPN Exit Rotation Cron (Recommended)
@@ -199,6 +210,7 @@ cloud-searxng/
 ├── scripts/
 │   ├── deploy.sh                 # Rsync + docker compose up
 │   ├── env.sh                    # Load OCI creds from Bitwarden
+│   ├── engine-health.sh          # Per-engine heartbeat (an engine that stopped answering)
 │   ├── health-check.sh           # Heartbeat health check
 │   └── rotate-exit.sh            # Rotate one gluetun exit (staggered pool rotation)
 └── terraform/

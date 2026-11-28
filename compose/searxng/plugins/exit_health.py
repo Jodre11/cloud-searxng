@@ -2,7 +2,7 @@
 """Record which engines answered each real search, so health is judged from real traffic.
 
 Mounted into the image at searx/plugins/exit_health.py. Appends one JSON line per first-page search to
-RECORD_PATH; scripts/health-check.sh reads the newest lines. Nothing is sent anywhere.
+RECORD_PATH; scripts/health-check.sh and scripts/engine-health.sh read them. Nothing is sent anywhere.
 
 Keep the imports to the public plugin base classes: a plugin that fails to import stops SearXNG from starting,
 and Watchtower updates the image unattended. Failures inside post_search are caught and logged by SearXNG.
@@ -21,7 +21,7 @@ if typing.TYPE_CHECKING:
 
     from . import PluginCfg
 
-# A tmpfs mounted by docker-compose.yml; records do not need to survive a restart.
+# A host directory mounted by docker-compose.yml, so records survive restarts (engine-health.sh needs them).
 RECORD_PATH = "/run/exit-health/records.jsonl"
 MAX_BYTES = 256 * 1024
 
