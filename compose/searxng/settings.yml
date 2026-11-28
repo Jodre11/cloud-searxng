@@ -298,8 +298,17 @@ engines:
     disabled: false
 
   # Scored 25/25 but left out by choice: a Russian operator under Russian data
-  # law. `inactive` so no query reaches it, not even by bang.
+  # law. `inactive` so no query reaches it, not even by bang. yandex images and
+  # yandex music must go with it: they borrow its network (`network: yandex`),
+  # and SearXNG crashes at startup (KeyError 'yandex') if that network's owner
+  # is inactive while a borrower is still loaded.
   - name: yandex
+    inactive: true
+
+  - name: yandex images
+    inactive: true
+
+  - name: yandex music
     inactive: true
 
   # System1 index (the one behind dogpile, which is 403'd here). Returns 4
