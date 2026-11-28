@@ -27,7 +27,8 @@ search:
     recaptcha_SearxEngineCaptcha: 604800
 
 server:
-  secret_key: "${SEARXNG_SECRET_KEY}"
+  # secret_key is set from the SEARXNG_SECRET environment variable (see docker-compose.yml). SearXNG does not
+  # expand "${...}" in this file, so a placeholder here would be used literally, and this repo is public.
   # Incoming abuse limiter is off: this instance is private (Tailscale-only, no
   # public ingress) and single-user. The limiter needs a Valkey/Redis backend it
   # doesn't have, so leaving it on only logged "limiter requires Valkey" errors.
