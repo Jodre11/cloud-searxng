@@ -7,7 +7,10 @@ general:
 search:
   safe_search: 0
   autocomplete: ""
-  default_lang: "en"
+  # A regional locale, not bare "en": duckduckgo sends "en" as kl=us-en and
+  # always gets a CAPTCHA (searxng #6986). google cse and seznam measured the
+  # same under en-GB as under en.
+  default_lang: "en-GB"
   formats:
     - html
     - json
@@ -152,17 +155,16 @@ engines:
   # retried on another before the engine is suspended. It does not help with
   # CAPTCHA pages served as HTTP 200; those are detected after the response.
 
-  # DuckDuckGo's HTML endpoint. Distinct from the `duckduckgo` engine below:
-  # that one uses the JSON API and gets 403d on these exits, while this one is
-  # unaffected. Scored 30/30. This is the closest thing to a mainstream index
-  # that works from here.
+  # DuckDuckGo's HTML endpoint. Scored 30/30 in July. Disabled 2026-11-28:
+  # QUIET, with 0 results and no error on 12 of 12 queries across en, en-GB,
+  # en-US and all. Its vqd token request gets HTTP 202 (DDG's anomaly page)
+  # and the engine returns an empty list. The `duckduckgo` engine below works
+  # again and covers the same index.
   - name: duckduckgo web
     engine: duckduckgo_web
     shortcut: ddgw
     weight: 1.5
-    retries: 2
-    retry_on_http_error: [403, 429]
-    disabled: false
+    disabled: true
 
   # Google results via the Programmable Search JSON path — reaches Google's
   # index without tripping the bot interstitial that kills the `google` engine.
@@ -185,15 +187,15 @@ engines:
     weight: 1.2
     disabled: true
 
-  # Scored 29/30. 2026-11-28: 429 on most requests, and a per-exit probe saw
-  # 429 from fresh exits too, so its limit is not keyed on our IP alone.
+  # Scored 29/30 in July. Disabled 2026-11-28: QUIET, with 0 results and no
+  # error on 6 of 6 queries. Direct requests got 429 from two exits and a 302
+  # redirect from the third, and an earlier probe saw 429 from fresh exits
+  # too, so its limit is not keyed on our exit IP and rotation cannot fix it.
   - name: privacywall
     engine: privacywall
     shortcut: pw
     weight: 1.0
-    retries: 2
-    retry_on_http_error: [403, 429]
-    disabled: false
+    disabled: true
 
   # Scored 30/30.
   - name: gmx
@@ -242,10 +244,11 @@ engines:
     inactive: false
     disabled: true
 
-  # --- Kept enabled: intermittent but LOUD when they fail ---
-  # 403/429/CAPTCHA on these exits much of the time. That is acceptable
-  # because the failure is reported rather than silently poisoning results,
-  # and when it answers the results are good. It also self-recovers.
+  # DuckDuckGo (JSON API). Its 100% CAPTCHA rate was a locale bug, not an IP
+  # block: the bare `en` locale is sent as kl=us-en, which DDG answers with a
+  # CAPTCHA every time (searxng #6986). Measured 2026-11-28: en and all gave
+  # CAPTCHA on 6 of 6 queries, while en-GB and en-US gave 10 relevant results
+  # on 6 of 6. Fixed by `search.default_lang: en-GB` above.
   - name: duckduckgo
     engine: duckduckgo
     shortcut: d
