@@ -206,14 +206,17 @@ engines:
     weight: 1.0
     disabled: true
 
-  # Scored 30/30.
+  # Scored 30/30 in July. Disabled 2026-11-28: CAPTCHA page from 16 of 16
+  # Mullvad exits across 15 providers, including relays never used here, so
+  # the block covers all of Mullvad and rotation cannot fix it. Still loaded,
+  # so `!gmx` re-tests it with one search.
   - name: gmx
     engine: gmx
     shortcut: gmx
     weight: 1.0
     retries: 2
     retry_on_http_error: [403, 429]
-    disabled: false
+    disabled: true
 
   # Scored 27/30. Czech index — adds genuinely different coverage.
   - name: seznam
