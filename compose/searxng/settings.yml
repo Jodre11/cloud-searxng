@@ -297,9 +297,10 @@ engines:
     inactive: false
     disabled: false
 
+  # Scored 25/25 but left out by choice: a Russian operator under Russian data
+  # law. `inactive` so no query reaches it, not even by bang.
   - name: yandex
-    inactive: false
-    disabled: false
+    inactive: true
 
   # System1 index (the one behind dogpile, which is 403'd here). Returns 4
   # results per page, all relevant.
