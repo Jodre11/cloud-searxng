@@ -18,7 +18,10 @@ export SAMPLE_SIZE="${SAMPLE_SIZE:-6}"
 IDLE_PROBE_AFTER="${IDLE_PROBE_AFTER:-$((6 * 60 * 60))}"
 RECHECK_AFTER="${RECHECK_AFTER:-$((30 * 60))}"
 PROBE_URL="http://127.0.0.1:8888/search?q=test&categories=general&format=json"
-RECORD_PATH="/var/cache/searxng/exit-health.jsonl"
+RECORD_PATH="/run/exit-health/records.jsonl"
+# Host-side stamp of the last synthetic search, so probes stay at most one per RECHECK_AFTER even when the
+# plugin records nothing (for example if it breaks after an image update).
+PROBE_STAMP="${PROBE_STAMP:-/opt/searxng/logs/health-last-probe}"
 # Touched by apt on every successful package-list refresh; if it goes stale, OS security updates have stopped.
 APT_STAMP="/var/lib/apt/periodic/update-success-stamp"
 APT_MAX_AGE_SECONDS=$((2 * 24 * 60 * 60))
@@ -61,7 +64,16 @@ fi
 read -r healthy newest_ts < <(read_records | evaluate) || exit 0
 age=$(($(date +%s) - newest_ts))
 
+since_probe=$(($(date +%s) - $(stat -c %Y "$PROBE_STAMP" 2>/dev/null || echo 0)))
+
+no_evidence=0
 if (( age > IDLE_PROBE_AFTER )) || { (( ! healthy )) && (( age > RECHECK_AFTER )); }; then
+    no_evidence=1
+fi
+
+if (( no_evidence && since_probe > RECHECK_AFTER )); then
+    mkdir -p "$(dirname "$PROBE_STAMP")"
+    touch "$PROBE_STAMP"
     # The plugin records the probe like any search, so it is judged the same way.
     curl -sf -o /dev/null --max-time 20 "$PROBE_URL" || exit 0
     read -r healthy newest_ts < <(read_records | evaluate) || exit 0
